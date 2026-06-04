@@ -73,7 +73,9 @@ try {
       "server-broadcast",
       (roomID: string, encryptedData: ArrayBuffer, iv: Uint8Array) => {
         socketDebug(`${socket.id} sends update to ${roomID}`);
-        socket.broadcast.to(roomID).emit("client-broadcast", encryptedData, iv);
+        socket.broadcast
+          .to(roomID)
+          .emit("client-scene-broadcast", encryptedData, iv);
       },
     );
 
@@ -83,7 +85,7 @@ try {
         socketDebug(`${socket.id} sends volatile update to ${roomID}`);
         socket.volatile.broadcast
           .to(roomID)
-          .emit("client-broadcast", encryptedData, iv);
+          .emit("client-scene-broadcast", encryptedData, iv);
       },
     );
 
