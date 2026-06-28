@@ -28,8 +28,43 @@ const port =
 
 app.use(express.static("public"));
 
+let activeConnections = 0;
+const roomMembership = new Map<string, Set<string>>();
+
+const trackJoin = (roomID: string, socketId: string) => {
+  if (!roomMembership.has(roomID)) {
+    roomMembership.set(roomID, new Set());
+  }
+  roomMembership.get(roomID)!.add(socketId);
+};
+
+const trackLeave = (roomID: string, socketId: string) => {
+  const members = roomMembership.get(roomID);
+  if (!members) {
+    return;
+  }
+  members.delete(socketId);
+  if (members.size === 0) {
+    roomMembership.delete(roomID);
+  }
+};
+
 app.get("/", (req, res) => {
   res.send("Excalidraw collaboration server is up :)");
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", uptime: process.uptime() });
+});
+
+app.get("/metrics", (req, res) => {
+  const collabRooms = Array.from(roomMembership.keys()).filter(
+    (roomID) => !roomID.startsWith("follow@"),
+  );
+  res.json({
+    activeConnections,
+    activeRooms: collabRooms.length,
+  });
 });
 
 const server = http.createServer(app);
@@ -51,10 +86,12 @@ try {
 
   io.on("connection", (socket) => {
     ioDebug("connection established!");
+    activeConnections++;
     io.to(`${socket.id}`).emit("init-room");
     socket.on("join-room", async (roomID) => {
       socketDebug(`${socket.id} has joined ${roomID}`);
       await socket.join(roomID);
+      trackJoin(roomID, socket.id);
       const sockets = await io.in(roomID).fetchSockets();
       if (sockets.length <= 1) {
         io.to(`${socket.id}`).emit("first-in-room");
@@ -129,7 +166,10 @@ try {
 
         const isFollowRoom = roomID.startsWith("follow@");
 
+        activeConnections--;
+
         if (!isFollowRoom && otherClients.length > 0) {
+          trackLeave(roomID, socket.id);
           socket.broadcast.to(roomID).emit(
             "room-user-change",
             otherClients.map((socket) => socket.id),
