@@ -53,6 +53,13 @@ try {
     ioDebug("connection established!");
     io.to(`${socket.id}`).emit("init-room");
     socket.on("join-room", async (roomID) => {
+      // A missing or non-string roomID makes `socket.join` throw inside this
+      // async listener, surfacing as an unhandled rejection that can crash the
+      // process. Reject the invalid join instead of acting on it.
+      if (typeof roomID !== "string" || !roomID) {
+        socketDebug(`${socket.id} sent an invalid join-room request`);
+        return;
+      }
       socketDebug(`${socket.id} has joined ${roomID}`);
       await socket.join(roomID);
       const sockets = await io.in(roomID).fetchSockets();
