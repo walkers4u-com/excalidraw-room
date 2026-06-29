@@ -72,6 +72,11 @@ try {
     socket.on(
       "server-broadcast",
       (roomID: string, encryptedData: ArrayBuffer, iv: Uint8Array) => {
+        // Only relay updates for rooms the sender has actually joined,
+        // otherwise any client can inject scene updates into arbitrary rooms.
+        if (!socket.rooms.has(roomID)) {
+          return;
+        }
         socketDebug(`${socket.id} sends update to ${roomID}`);
         socket.broadcast.to(roomID).emit("client-broadcast", encryptedData, iv);
       },
@@ -80,6 +85,11 @@ try {
     socket.on(
       "server-volatile-broadcast",
       (roomID: string, encryptedData: ArrayBuffer, iv: Uint8Array) => {
+        // Only relay updates for rooms the sender has actually joined,
+        // otherwise any client can inject scene updates into arbitrary rooms.
+        if (!socket.rooms.has(roomID)) {
+          return;
+        }
         socketDebug(`${socket.id} sends volatile update to ${roomID}`);
         socket.volatile.broadcast
           .to(roomID)
