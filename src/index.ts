@@ -43,7 +43,11 @@ try {
     transports: ["websocket", "polling"],
     cors: {
       allowedHeaders: ["Content-Type", "Authorization"],
-      origin: process.env.CORS_ORIGIN || "*",
+      // When `credentials` is enabled the CORS spec forbids a wildcard
+      // `Access-Control-Allow-Origin`, so browsers reject the response.
+      // Reflect the request origin (cors `origin: true`) when no explicit
+      // origin is configured so credentialed connections keep working.
+      origin: process.env.CORS_ORIGIN || true,
       credentials: true,
     },
     allowEIO3: true,
@@ -88,6 +92,14 @@ try {
     );
 
     socket.on("user-follow", async (payload: OnUserFollowedPayload) => {
+      // Guard against malformed payloads: an unhandled throw inside this async
+      // listener surfaces as an unhandled promise rejection and can crash the
+      // process, letting any client take the server down with one bad message.
+      if (!payload?.userToFollow?.socketId || !payload.action) {
+        socketDebug(`${socket.id} sent an invalid user-follow payload`);
+        return;
+      }
+
       const roomID = `follow@${payload.userToFollow.socketId}`;
 
       switch (payload.action) {
